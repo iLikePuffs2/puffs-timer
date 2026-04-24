@@ -54,7 +54,14 @@
       ]
     }
   ],
+  "onetimeAlarms": [
+    {
+      "time": "21:50",
+      "label": "测试3",
+      "targetDate": "2026-04-24"
+    }
+  ],
   "countupNotifyMinutes": 30,
-  "countupDailyTotal": 36,
+  "countupDailyTotal": 353,
   "countupDailyDate": "2026-04-24"
 }

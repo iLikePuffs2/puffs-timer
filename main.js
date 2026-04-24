@@ -39,6 +39,7 @@ const DEFAULT_SETTINGS = {
     enableShutdown:       true,    // 启用定时关机
     shutdownTime:         '',      // 关机时间，格式 "HH:MM"
     dailyReminders:       [],      // 每日定时提醒列表 [{time, label, enabled, days}]
+    onetimeAlarms:        [],      // 一次性闹钟列表 [{time, label, targetDate}]
     countupNotifyMinutes: 0,      // 正计时累计提醒间隔（分钟），0 = 关闭
     countupDailyTotal:    0,       // 今日累计正计时（秒），每日自动清零
     countupDailyDate:     '',      // 累计正计时的日期标记，用于跨日清零
@@ -144,6 +145,29 @@ function sortReminders(arr) {
 }
 
 /**
+ * 将一次性闹钟数组按日期+时间升序排列（原地排序）
+ */
+function sortOneTimeAlarms(arr) {
+    arr.sort((a, b) => {
+        const dc = a.targetDate.localeCompare(b.targetDate);
+        if (dc !== 0) return dc;
+        return a.time.localeCompare(b.time);
+    });
+}
+
+/**
+ * 校验日期字符串是否为合法的 "YYYY-MM-DD" 格式
+ * @param   {string} str - 待校验的字符串
+ * @returns {boolean}
+ */
+function isValidDateStr(str) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(str)) return false;
+    const [y, m, d] = str.split('-').map(Number);
+    const date = new Date(y, m - 1, d);
+    return date.getFullYear() === y && date.getMonth() === m - 1 && date.getDate() === d;
+}
+
+/**
  * 将星期数组格式化为可读文本
  * @example [1,2,3,4,5] → "工作日", [0,6] → "周末", [1,3,5] → "周一 周三 周五"
  */
@@ -196,6 +220,8 @@ class PuffsTimerPlugin extends Plugin {
                     this.timerView.remainingSeconds = 0;
                     this.timerView.renderDisplay(0);
                     this.timerView.handlePlayPause();
+                } else if (this.timerView?.state === 'paused' && this.timerView.mode === 'countup') {
+                    this.timerView.handlePlayPause();
                 }
             },
         });
@@ -236,8 +262,8 @@ class PuffsTimerPlugin extends Plugin {
         let leaf = workspace.getLeavesOfType(VIEW_TYPE)[0];
         if (!leaf) {
             leaf = workspace.getRightLeaf(false);
-            await leaf.setViewState({ type: VIEW_TYPE, active: true });
         }
+        await leaf.setViewState({ type: VIEW_TYPE, active: true });
     }
 
     /* ────────── 设置持久化 ────────── */
@@ -364,8 +390,14 @@ class PuffsTimerPlugin extends Plugin {
     /** 启动提醒检查轮询（每 30 秒检查一次，首次延迟 3 秒以避免启动瞬间误触发） */
     startReminderCheck() {
         this.clearReminderCheck();
-        this.reminderCheckInterval = window.setInterval(() => this.checkReminders(), 30_000);
-        setTimeout(() => this.checkReminders(), 3000);
+        this.reminderCheckInterval = window.setInterval(() => {
+            this.checkReminders();
+            this.checkOneTimeAlarms();
+        }, 30_000);
+        setTimeout(() => {
+            this.checkReminders();
+            this.checkOneTimeAlarms();
+        }, 3000);
     }
 
     /** 清除提醒检查定时器 */
@@ -404,6 +436,49 @@ class PuffsTimerPlugin extends Plugin {
                 setTimeout(() => this.playDing(), 2000);
                 new Notice(r.label, 10_000);
             }
+        }
+    }
+
+    /* ────────── 一次性闹钟 ────────── */
+
+    /** 检查并触发/清理一次性闹钟 */
+    checkOneTimeAlarms() {
+        const now = new Date();
+        const today = getTodayStr();
+        const currentHM = pad2(now.getHours()) + ':' + pad2(now.getMinutes());
+
+        let changed = false;
+        const remaining = [];
+
+        for (const alarm of this.settings.onetimeAlarms) {
+            /* 日期已过 → 过期删除 */
+            if (alarm.targetDate < today) { changed = true; continue; }
+
+            if (alarm.targetDate === today) {
+                if (alarm.time === currentHM) {
+                    /* 时间匹配 → 触发提醒并删除 */
+                    const key = `onetime|${alarm.targetDate}|${alarm.time}`;
+                    if (!this.firedReminders.has(key)) {
+                        this.firedReminders.add(key);
+                        this.playDing();
+                        setTimeout(() => this.playDing(), 2000);
+                        new Notice(alarm.label, 10_000);
+                    }
+                    changed = true;
+                    continue;
+                }
+                if (alarm.time < currentHM) {
+                    /* 今天的时间已过 → 过期删除 */
+                    changed = true;
+                    continue;
+                }
+            }
+            remaining.push(alarm);
+        }
+
+        if (changed) {
+            this.settings.onetimeAlarms = remaining;
+            this.saveSettings();
         }
     }
 
@@ -812,11 +887,12 @@ class PuffsTimerSettingTab extends PluginSettingTab {
         const { containerEl } = this;
         containerEl.empty();
 
-        this.renderOutlineSection(containerEl);
-        this.renderStatusBarSection(containerEl);
-        this.renderCountupSection(containerEl);
         this.renderReminderSection(containerEl);
+        this.renderOneTimeAlarmSection(containerEl);
         this.renderShutdownSection(containerEl);
+        this.renderCountupSection(containerEl);
+        this.renderStatusBarSection(containerEl);
+        this.renderOutlineSection(containerEl);
     }
 
     /* ── 自动跳转大纲 ── */
@@ -965,6 +1041,104 @@ class PuffsTimerSettingTab extends PluginSettingTab {
                         days: [...ALL_DAYS],
                     });
                     sortReminders(this.plugin.settings.dailyReminders);
+                    await this.plugin.saveSettings();
+                    this.display();
+                }));
+    }
+
+    /* ── 一次性闹钟 ── */
+
+    renderOneTimeAlarmSection(el) {
+        el.createEl('h2', { text: '一次性闹钟' });
+
+        sortOneTimeAlarms(this.plugin.settings.onetimeAlarms);
+
+        for (let i = 0; i < this.plugin.settings.onetimeAlarms.length; i++) {
+            this.renderOneTimeAlarmItem(el, i);
+        }
+
+        this.renderAddOneTimeAlarm(el);
+    }
+
+    /** 渲染单条一次性闹钟的设置行（仅 编辑、删除 按钮，无启用开关） */
+    renderOneTimeAlarmItem(el, index) {
+        const alarm = this.plugin.settings.onetimeAlarms[index];
+
+        new Setting(el)
+            .setName(alarm.label || '未命名闹钟')
+            .setDesc(`${alarm.targetDate}  ${alarm.time}`)
+            .addExtraButton(btn => btn
+                .setIcon('pencil')
+                .setTooltip('编辑')
+                .onClick(() => {
+                    new OneTimeAlarmEditModal(this.app, alarm, async updated => {
+                        Object.assign(alarm, updated);
+                        sortOneTimeAlarms(this.plugin.settings.onetimeAlarms);
+                        await this.plugin.saveSettings();
+                        this.display();
+                    }).open();
+                }))
+            .addExtraButton(btn => btn
+                .setIcon('trash')
+                .setTooltip('删除')
+                .onClick(async () => {
+                    this.plugin.settings.onetimeAlarms.splice(index, 1);
+                    await this.plugin.saveSettings();
+                    this.display();
+                }));
+    }
+
+    /** 渲染"添加新闹钟"表单行 */
+    renderAddOneTimeAlarm(el) {
+        let dateInput, timeInput, labelInput;
+
+        new Setting(el)
+            .setName('添加新闹钟')
+            .addText(t => {
+                dateInput = t;
+                t.setPlaceholder('YYYY-MM-DD');
+                t.setValue(getTodayStr());
+                t.inputEl.style.width = '110px';
+            })
+            .addText(t => {
+                timeInput = t;
+                t.setPlaceholder('HH:MM');
+                t.inputEl.style.width = '80px';
+            })
+            .addText(t => {
+                labelInput = t;
+                t.setPlaceholder('提醒内容');
+            })
+            .addExtraButton(btn => btn
+                .setIcon('plus')
+                .setTooltip('添加')
+                .onClick(async () => {
+                    const dateStr = dateInput.getValue().trim();
+                    const timeStr = timeInput.getValue().trim();
+                    const label   = labelInput.getValue().trim();
+
+                    if (!isValidDateStr(dateStr)) { new Notice('⚠️ 日期格式不正确，请使用 YYYY-MM-DD 格式'); return; }
+
+                    const parsed = parseTimeStr(timeStr);
+                    if (!parsed) { new Notice('⚠️ 时间格式不正确，请使用 HH:MM 格式'); return; }
+                    if (!label)  { new Notice('⚠️ 请输入提醒内容'); return; }
+
+                    const today = getTodayStr();
+                    const now = new Date();
+                    const currentHM = pad2(now.getHours()) + ':' + pad2(now.getMinutes());
+                    const normalizedTime = pad2(parsed.h) + ':' + pad2(parsed.m);
+
+                    if (dateStr < today || (dateStr === today && normalizedTime <= currentHM)) {
+                        new Notice('⚠️ 闹钟时间必须在当前时间之后');
+                        return;
+                    }
+
+                    this.plugin.settings.onetimeAlarms.push({
+                        time: normalizedTime,
+                        label,
+                        targetDate: dateStr,
+                    });
+                    sortOneTimeAlarms(this.plugin.settings.onetimeAlarms);
                     await this.plugin.saveSettings();
                     this.display();
                 }));
@@ -1142,6 +1316,104 @@ class ReminderEditModal extends Modal {
 
         this.data.time  = pad2(parsed.h) + ':' + pad2(parsed.m);
         this.data.label = label;
+        this.onSave(this.data);
+        this.close();
+    }
+}
+
+/* ═══════════════════════════════════════════
+   一次性闹钟编辑弹窗
+   ═══════════════════════════════════════════ */
+class OneTimeAlarmEditModal extends Modal {
+
+    /**
+     * @param {App}      app     - Obsidian App 实例
+     * @param {object}   alarm   - 要编辑的闹钟对象 {time, label, targetDate}
+     * @param {Function} onSave  - 保存回调，接收更新后的数据
+     */
+    constructor(app, alarm, onSave) {
+        super(app);
+        this.data = {
+            time:       alarm.time,
+            label:      alarm.label,
+            targetDate: alarm.targetDate,
+        };
+        this.onSave = onSave;
+    }
+
+    onOpen() {
+        const { contentEl } = this;
+        contentEl.empty();
+        contentEl.addClass('puffs-reminder-modal');
+        contentEl.createEl('h3', { text: '编辑一次性闹钟' });
+
+        /* ── 日期输入 ── */
+        new Setting(contentEl)
+            .setName('日期')
+            .addText(t => {
+                this.dateInput = t;
+                t.setValue(this.data.targetDate);
+                t.setPlaceholder('YYYY-MM-DD');
+                t.inputEl.style.width = '110px';
+            });
+
+        /* ── 时间输入 ── */
+        new Setting(contentEl)
+            .setName('时间')
+            .addText(t => {
+                this.timeInput = t;
+                t.setValue(this.data.time);
+                t.setPlaceholder('HH:MM');
+                t.inputEl.style.width = '80px';
+            });
+
+        /* ── 提醒内容输入 ── */
+        new Setting(contentEl)
+            .setName('提醒内容')
+            .addText(t => {
+                this.labelInput = t;
+                t.setValue(this.data.label);
+                t.setPlaceholder('如：开会');
+            });
+
+        /* ── 底部操作按钮 ── */
+        const footer = contentEl.createDiv({ cls: 'puffs-modal-footer' });
+
+        const saveBtn = footer.createEl('button', { text: '保存', cls: 'mod-cta' });
+        saveBtn.addEventListener('click', () => this.handleSave());
+
+        const cancelBtn = footer.createEl('button', { text: '取消' });
+        cancelBtn.addEventListener('click', () => this.close());
+    }
+
+    onClose() {
+        this.contentEl.empty();
+    }
+
+    /** 保存按钮的点击处理：校验输入 → 回调通知外部 → 关闭弹窗 */
+    handleSave() {
+        const dateStr = this.dateInput.getValue().trim();
+        const timeStr = this.timeInput.getValue().trim();
+        const label   = this.labelInput.getValue().trim();
+
+        if (!isValidDateStr(dateStr))    { new Notice('⚠️ 日期格式不正确'); return; }
+        const parsed = parseTimeStr(timeStr);
+        if (!parsed)                     { new Notice('⚠️ 时间格式不正确'); return; }
+        if (!label)                      { new Notice('⚠️ 请输入提醒内容'); return; }
+
+        const today = getTodayStr();
+        const now = new Date();
+        const currentHM = pad2(now.getHours()) + ':' + pad2(now.getMinutes());
+        const normalizedTime = pad2(parsed.h) + ':' + pad2(parsed.m);
+
+        if (dateStr < today || (dateStr === today && normalizedTime <= currentHM)) {
+            new Notice('⚠️ 闹钟时间必须在当前时间之后');
+            return;
+        }
+
+        this.data.targetDate = dateStr;
+        this.data.time       = normalizedTime;
+        this.data.label      = label;
         this.onSave(this.data);
         this.close();
     }
