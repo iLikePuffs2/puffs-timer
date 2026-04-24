@@ -1,0 +1,9 @@
+{
+    "id": "puffs-timer",
+    "name": "Puffs 计时器",
+    "version": "1.0.0",
+    "minAppVersion": "1.12.7",
+    "description": "一个简易的计时器",
+    "author": "Puffs",
+    "isDesktopOnly": true
+}

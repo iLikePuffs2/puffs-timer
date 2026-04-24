@@ -1,0 +1,254 @@
+/* ══════════════════════════════════════════
+   Puffs Timer — 样式表
+   ══════════════════════════════════════════ */
+
+/* 根容器：撑满侧边栏高度，用于垂直居中 */
+.puffs-timer-root {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    padding: 20px 12px;
+    box-sizing: border-box;
+}
+
+/* 内层包裹：限制最大宽度，承载所有内容 */
+.puffs-timer-wrapper {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    max-width: 300px;
+    width: 100%;
+    gap: 10px;
+}
+
+/* ── 倒计时数字显示 ───── */
+
+.puffs-timer-display {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 2px;
+
+    font-family: 'SF Mono', 'Fira Code', var(--font-monospace);
+    font-size: 1.7rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+
+    letter-spacing: 1px;
+    text-indent: 1px;
+
+    padding: 12px 8px;
+    width: 100%;
+    border-radius: 10px;
+    background: var(--background-secondary);
+    color: var(--text-normal);
+    transition: color 0.3s ease, background 0.3s ease;
+    user-select: none;
+    white-space: nowrap;
+}
+
+/* 运行中 — 强调色 */
+.puffs-timer-display.is-running {
+    color: var(--interactive-accent);
+}
+
+/* 暂停中 — 闪烁 */
+.puffs-timer-display.is-paused {
+    color: var(--text-muted);
+    animation: puffs-blink 1.2s ease-in-out infinite;
+}
+
+@keyframes puffs-blink {
+    0%, 100% { opacity: 1; }
+    50%      { opacity: 0.35; }
+}
+
+/* 分隔符 */
+.puffs-display-sep {
+    color: var(--text-muted);
+}
+
+/* 数字 span — 空闲时可点击编辑 */
+.puffs-digit {
+    display: inline-block;
+    min-width: 2ch;
+    text-align: center;
+    transition: background 0.15s;
+    border-radius: 4px;
+    padding: 2px 4px;
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "zero" 0;
+}
+
+/* 空闲态悬浮提示可编辑 */
+.puffs-timer-display.is-editable .puffs-digit {
+    cursor: text;
+}
+.puffs-timer-display.is-editable .puffs-digit:hover {
+    background: var(--background-modifier-hover);
+}
+
+/* 内联编辑输入框 — 融入数字显示 */
+.puffs-digit-input {
+    width: 2ch;
+    font-family: inherit;
+    font-size: inherit;
+    font-weight: inherit;
+    font-feature-settings: "zero" 0;
+    line-height: 1.4;
+    text-align: center;
+    background: var(--background-primary);
+    color: var(--text-normal);
+
+    border: none;
+    outline: 1px solid var(--interactive-accent);
+    outline-offset: -1px;
+
+    border-radius: 4px;
+    padding: 2px 4px;
+    margin: 0;
+    box-sizing: content-box;
+
+    vertical-align: baseline;
+    -moz-appearance: textfield;
+}
+.puffs-digit-input::-webkit-inner-spin-button,
+.puffs-digit-input::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+/* ── 操作按钮 ─────────── */
+
+.puffs-timer-controls {
+    display: flex;
+    justify-content: center;
+    position: relative;
+    width: 100%;
+}
+
+/* 重置按钮默认隐藏，仅在暂停时显示 */
+.puffs-btn-reset {
+    display: none !important;
+    position: absolute;
+    left: calc(50% + 55px);
+    top: 50%;
+    transform: translateY(-50%);
+}
+
+/* 修复重置按钮悬浮时掉下去的 bug，整合 translateY 与 scale */
+.puffs-btn-reset:hover {
+    transform: translateY(-50%) scale(1.1) !important;
+}
+
+/* 暂停状态：通过兄弟选择器显示重置按钮 */
+.puffs-timer-display.is-paused ~ .puffs-timer-controls .puffs-btn-reset {
+    display: flex !important;
+}
+
+.puffs-timer-btn {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    border: 1px solid var(--background-modifier-border);
+    background: var(--background-secondary);
+    color: var(--text-normal);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s, border-color 0.2s, transform 0.15s;
+}
+
+.puffs-timer-btn:hover {
+    background: var(--background-modifier-hover);
+    border-color: var(--text-muted);
+    transform: scale(1.1);
+}
+
+.puffs-timer-btn .svg-icon {
+    width: 20px;
+    height: 20px;
+}
+
+/* ── 状态栏 ──────────── */
+
+.puffs-status-bar {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    margin-left: 0 !important;
+    padding-left: 0 !important;
+    cursor: pointer;
+    user-select: none;
+    transition: color 0.2s;
+}
+
+.puffs-status-bar:hover {
+    color: var(--interactive-accent);
+}
+
+.puffs-status-bar-icon .svg-icon {
+    width: 12px;
+    height: 12px;
+}
+
+/* ── 提醒编辑弹窗 ────── */
+
+.puffs-reminder-modal { padding: 4px 0; }
+
+.puffs-days-wrap {
+    display: flex;
+    gap: 4px;
+    flex-wrap: wrap;
+}
+
+.puffs-day-btn {
+    width: 32px;
+    height: 28px;
+    border-radius: 6px;
+    border: 1px solid var(--background-modifier-border);
+    background: var(--background-secondary);
+    color: var(--text-muted);
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.puffs-day-btn.is-active {
+    background: var(--interactive-accent);
+    color: var(--text-on-accent);
+    border-color: var(--interactive-accent);
+}
+
+.puffs-day-btn:hover {
+    border-color: var(--interactive-accent);
+}
+
+.puffs-days-shortcuts {
+    display: flex;
+    gap: 8px;
+    margin-top: 6px;
+}
+
+.puffs-days-shortcut {
+    font-size: 0.75rem;
+    color: var(--text-faint);
+    cursor: pointer;
+    text-decoration: underline;
+    text-decoration-style: dotted;
+    text-underline-offset: 2px;
+}
+
+.puffs-days-shortcut:hover {
+    color: var(--interactive-accent);
+}
+
+.puffs-modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 16px;
+}

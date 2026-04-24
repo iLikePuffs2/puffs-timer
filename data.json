@@ -1,0 +1,60 @@
+{
+  "countdownAutoOutline": true,
+  "countupAutoOutline": true,
+  "statusBarCountdown": true,
+  "statusBarCountup": true,
+  "enableShutdown": false,
+  "shutdownTime": "23:50",
+  "dailyReminders": [
+    {
+      "time": "11:20",
+      "label": "该吃午饭啦~",
+      "enabled": true,
+      "days": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6
+      ]
+    },
+    {
+      "time": "12:30",
+      "label": "睡午觉去啦~",
+      "enabled": true
+    },
+    {
+      "time": "17:30",
+      "label": "蒸饭做晚餐啦~",
+      "enabled": true,
+      "days": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6
+      ]
+    },
+    {
+      "time": "23:59",
+      "label": "准备睡觉",
+      "enabled": true,
+      "days": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6
+      ]
+    }
+  ],
+  "countupNotifyMinutes": 30,
+  "countupDailyTotal": 36,
+  "countupDailyDate": "2026-04-24"
+}
