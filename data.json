@@ -4,11 +4,11 @@
   "statusBarCountdown": true,
   "statusBarCountup": true,
   "enableShutdown": false,
-  "shutdownTime": "23:50",
+  "shutdownTime": "02:20",
   "dailyReminders": [
     {
-      "time": "11:20",
-      "label": "该吃午饭啦~",
+      "time": "11:50",
+      "label": "吃午饭",
       "enabled": true,
       "days": [
         0,
@@ -19,29 +19,10 @@
         5,
         6
       ]
-    },
-    {
-      "time": "12:30",
-      "label": "睡午觉去啦~",
-      "enabled": true
     },
     {
       "time": "17:30",
-      "label": "蒸饭做晚餐啦~",
-      "enabled": true,
-      "days": [
-        0,
-        1,
-        2,
-        3,
-        4,
-        5,
-        6
-      ]
-    },
-    {
-      "time": "23:59",
-      "label": "准备睡觉",
+      "label": "吃晚饭",
       "enabled": true,
       "days": [
         0,
@@ -54,14 +35,8 @@
       ]
     }
   ],
-  "onetimeAlarms": [
-    {
-      "time": "21:50",
-      "label": "测试3",
-      "targetDate": "2026-04-24"
-    }
-  ],
-  "countupNotifyMinutes": 30,
-  "countupDailyTotal": 353,
-  "countupDailyDate": "2026-04-24"
+  "onetimeAlarms": [],
+  "countupNotifyMinutes": 0,
+  "countupDailyTotal": 0,
+  "countupDailyDate": "2026-07-03"
 }

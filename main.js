@@ -368,10 +368,10 @@ class PuffsTimerPlugin extends Plugin {
             /* 提前 15 分钟预警（仅触发一次） */
             if (remaining <= 900_000 && remaining > 0 && !this.shutdownWarned) {
                 this.shutdownWarned = true;
-                new Notice('⚠️ 电脑将在 15 分钟后关机！', 900_000);
-                this.playDing();
-                setTimeout(() => this.playDing(), 2000);
-                setTimeout(() => this.playDing(), 4000);
+                // new Notice('⚠️ 电脑将在 15 分钟后关机！', 900_000);
+                // this.playDing();
+                // setTimeout(() => this.playDing(), 2000);
+                // setTimeout(() => this.playDing(), 4000);
             }
 
             /* 时间到达：执行关机，并将目标推到次日 */
