@@ -3,8 +3,8 @@
   "countupAutoOutline": true,
   "statusBarCountdown": true,
   "statusBarCountup": true,
-  "enableShutdown": false,
-  "shutdownTime": "02:20",
+  "enableShutdown": true,
+  "shutdownTime": "02:00",
   "dailyReminders": [
     {
       "time": "11:50",
@@ -38,5 +38,5 @@
   "onetimeAlarms": [],
   "countupNotifyMinutes": 0,
   "countupDailyTotal": 0,
-  "countupDailyDate": "2026-07-03"
+  "countupDailyDate": "2026-07-04"
 }

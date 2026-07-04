@@ -72,12 +72,20 @@
 
 /* 数字 span — 空闲时可点击编辑 */
 .puffs-digit {
-    display: inline-block;
-    min-width: 2ch;
+    --puffs-digit-box-size: calc(2ch + 14px);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 var(--puffs-digit-box-size);
+    width: var(--puffs-digit-box-size);
+    min-width: var(--puffs-digit-box-size);
+    height: var(--puffs-digit-box-size);
     text-align: center;
     transition: background 0.15s;
     border-radius: 4px;
-    padding: 2px 4px;
+    padding: 0;
+    line-height: 1.4;
+    box-sizing: border-box;
     font-variant-numeric: tabular-nums;
     font-feature-settings: "zero" 0;
 }
@@ -91,13 +99,23 @@
 }
 
 /* 内联编辑输入框 — 融入数字显示 */
-.puffs-digit-input {
-    width: 2ch;
+.puffs-timer-display .puffs-digit > input.puffs-digit-input {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    height: 100%;
+    min-width: 0;
+    min-inline-size: 0;
+    max-inline-size: 100%;
+    flex: 0 0 100%;
     font-family: inherit;
     font-size: inherit;
     font-weight: inherit;
+    font-variant-numeric: inherit;
     font-feature-settings: "zero" 0;
-    line-height: 1.4;
+    letter-spacing: inherit;
+    text-indent: inherit;
+    line-height: var(--puffs-digit-box-size);
     text-align: center;
     background: var(--background-primary);
     color: var(--text-normal);
@@ -107,15 +125,16 @@
     outline-offset: -1px;
 
     border-radius: 4px;
-    padding: 2px 4px;
+    padding: 0;
     margin: 0;
-    box-sizing: content-box;
+    box-sizing: border-box;
 
-    vertical-align: baseline;
+    vertical-align: top;
+    appearance: textfield;
     -moz-appearance: textfield;
 }
-.puffs-digit-input::-webkit-inner-spin-button,
-.puffs-digit-input::-webkit-outer-spin-button {
+.puffs-timer-display .puffs-digit > input.puffs-digit-input::-webkit-inner-spin-button,
+.puffs-timer-display .puffs-digit > input.puffs-digit-input::-webkit-outer-spin-button {
     -webkit-appearance: none;
     margin: 0;
 }
