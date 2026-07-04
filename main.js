@@ -18,6 +18,9 @@ const { exec } = require('child_process');
 /** 侧边栏视图的唯一标识符 */
 const VIEW_TYPE = 'puffs-timer-view';
 
+/** 切换定时关机命令的插件内 ID */
+const TOGGLE_SHUTDOWN_COMMAND_ID = 'toggle-shutdown';
+
 /** 星期显示顺序：周一 → 周日（符合中文习惯） */
 const DAY_ORDER = [1, 2, 3, 4, 5, 6, 0];
 
@@ -121,6 +124,16 @@ function formatCompactTime(seconds) {
     }
     if (seconds >= 60) return `${Math.floor(seconds / 60)}m`;
     return '<1m';
+}
+
+/**
+ * 将剩余秒数格式化为关机命令名中使用的 "xxh xxmin"。
+ */
+function formatShutdownRemaining(seconds) {
+    const totalMinutes = Math.ceil(Math.max(0, seconds) / 60);
+    const h = Math.floor(totalMinutes / 60);
+    const m = totalMinutes % 60;
+    return `${h}h ${m}min`;
 }
 
 /**
@@ -228,6 +241,11 @@ class PuffsTimerPlugin extends Plugin {
                 }
             },
         });
+        this.addCommand({
+            id: TOGGLE_SHUTDOWN_COMMAND_ID,
+            name: this.getShutdownCommandName(),
+            callback: () => this.toggleShutdownFromCommand(),
+        });
 
         /* ── 状态栏：显示计时信息 ── */
         this.initStatusBar();
@@ -292,6 +310,35 @@ class PuffsTimerPlugin extends Plugin {
         await this.saveData(this.settings);
     }
 
+    /* ────────── 命令面板 ────────── */
+
+    /** 获取切换定时关机命令的显示名称 */
+    getShutdownCommandName() {
+        const status = this.settings.enableShutdown ? '启用' : '停用';
+        let name = `启用/停用定时关机，当前状态：${status}`;
+        const target = this.getShutdownTargetDate();
+        if (this.settings.enableShutdown && target) {
+            const remaining = Math.ceil((target.getTime() - Date.now()) / 1000);
+            name += `，剩余时间：${formatShutdownRemaining(remaining)}`;
+        }
+        return name;
+    }
+
+    /** 更新命令面板中的定时关机命令名称 */
+    updateShutdownCommandName() {
+        const commandId = `${this.manifest.id}:${TOGGLE_SHUTDOWN_COMMAND_ID}`;
+        const command = this.app.commands.commands[commandId];
+        if (command) command.name = this.getShutdownCommandName();
+    }
+
+    /** 通过命令面板启用或停用定时关机 */
+    async toggleShutdownFromCommand() {
+        this.settings.enableShutdown = !this.settings.enableShutdown;
+        await this.saveSettings();
+        this.scheduleShutdown();
+        new Notice(`定时关机已${this.settings.enableShutdown ? '启用' : '停用'}`);
+    }
+
     /* ────────── 状态栏 ────────── */
 
     /** 初始化状态栏元素，并绑定鼠标交互事件 */
@@ -352,6 +399,20 @@ class PuffsTimerPlugin extends Plugin {
             window.clearInterval(this.shutdownCheckInterval);
             this.shutdownCheckInterval = null;
         }
+        this.shutdownTarget = null;
+    }
+
+    /** 计算下一次关机目标时间；设置无效时返回 null */
+    getShutdownTargetDate() {
+        if (!this.settings.enableShutdown || !this.settings.shutdownTime) return null;
+
+        const parsed = parseTimeStr(this.settings.shutdownTime);
+        if (!parsed) return null;
+
+        const now = new Date();
+        const target = new Date(now.getFullYear(), now.getMonth(), now.getDate(), parsed.h, parsed.m);
+        if (target <= now) target.setDate(target.getDate() + 1);
+        return target;
     }
 
     /**
@@ -361,25 +422,16 @@ class PuffsTimerPlugin extends Plugin {
      */
     scheduleShutdown() {
         this.clearShutdownTimer();
-        if (!this.settings.enableShutdown || !this.settings.shutdownTime) return;
+        this.shutdownTarget = this.getShutdownTargetDate();
+        this.updateShutdownCommandName();
+        if (!this.shutdownTarget) return;
 
-        const parsed = parseTimeStr(this.settings.shutdownTime);
-        if (!parsed) return;
-
-        /* 计算下一个关机目标时刻（若今天已过则推到明天） */
-        const calcTarget = () => {
-            const now = new Date();
-            const target = new Date(now.getFullYear(), now.getMonth(), now.getDate(), parsed.h, parsed.m);
-            if (target <= now) target.setDate(target.getDate() + 1);
-            return target;
-        };
-
-        this.shutdownTarget = calcTarget();
         this.shutdownWarned = false;
 
         /* 每分钟检查一次距关机的剩余时间 */
         this.shutdownCheckInterval = window.setInterval(() => {
             const remaining = this.shutdownTarget.getTime() - Date.now();
+            this.updateShutdownCommandName();
 
             /* 提前 15 分钟预警（仅触发一次） */
             if (remaining <= 900_000 && remaining > 0 && !this.shutdownWarned) {
@@ -395,8 +447,9 @@ class PuffsTimerPlugin extends Plugin {
                 exec('shutdown /s /t 0', err => {
                     if (err) console.error('Puffs Timer: 关机命令执行失败', err);
                 });
-                this.shutdownTarget.setDate(this.shutdownTarget.getDate() + 1);
+                this.shutdownTarget = this.getShutdownTargetDate();
                 this.shutdownWarned = false;
+                this.updateShutdownCommandName();
             }
         }, 60_000);
     }
