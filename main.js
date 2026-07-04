@@ -5,7 +5,7 @@
     · 倒计时 / 正计时（侧边栏面板 + 状态栏同步显示）
     · 每日定时提醒（支持按星期循环、弹窗编辑）
     · 正计时累计提醒（每隔 N 分钟提示音）
-    · 定时关机（提前 15 分钟预警）
+    · 定时关机
 ══════════════════════════════════════════════════════════════*/
 
 const { Plugin, ItemView, setIcon, PluginSettingTab, Setting, Notice, Modal } = require('obsidian');
@@ -200,6 +200,9 @@ class PuffsTimerPlugin extends Plugin {
             this.timerView = new PuffsTimerView(leaf, this);
             return this.timerView;
         });
+        this.registerEvent(this.app.workspace.on('active-leaf-change', leaf => {
+            this.focusTimerPanelIfActive(leaf);
+        }));
 
         /* ── 左侧 Ribbon 图标 ── */
         this.addRibbonIcon('timer', 'Puffs Timer', () => this.activateView());
@@ -253,6 +256,19 @@ class PuffsTimerPlugin extends Plugin {
             await leaf.setViewState({ type: VIEW_TYPE, active: true });
         }
         workspace.revealLeaf(leaf);
+        this.focusTimerPanel();
+    }
+
+    /** 当前活动 leaf 是计时器视图时，将焦点放到计时器面板背景 */
+    focusTimerPanelIfActive(leaf) {
+        const view = leaf?.view;
+        if (view?.getViewType?.() !== VIEW_TYPE) return;
+        window.requestAnimationFrame(() => view.focusPanel?.());
+    }
+
+    /** 在视图显示完成后聚焦计时器面板背景 */
+    focusTimerPanel() {
+        window.requestAnimationFrame(() => this.timerView?.focusPanel());
     }
 
     /** 静默确保视图实例已创建（不聚焦面板，用于命令调用前的前置准备） */
@@ -676,6 +692,11 @@ class PuffsTimerView extends ItemView {
         const root = this.contentEl;
         root.empty();
         root.addClass('puffs-timer-root');
+        root.tabIndex = -1;
+        root.addEventListener('keydown', e => this.handlePanelKeydown(e));
+        root.addEventListener('click', e => {
+            if (e.target === root || e.target === this.wrapper) this.focusPanel();
+        });
 
         this.wrapper = root.createDiv({ cls: 'puffs-timer-wrapper' });
 
@@ -707,6 +728,30 @@ class PuffsTimerView extends ItemView {
         /* 初始渲染 */
         this.renderDisplay(this.totalSeconds);
         this.refreshUI();
+    }
+
+    /** 将键盘焦点放回计时器面板背景 */
+    focusPanel() {
+        this.contentEl.focus({ preventScroll: true });
+    }
+
+    /** 面板背景获得焦点时，按 Enter 等同于点击播放/暂停按钮 */
+    handlePanelKeydown(e) {
+        if (e.key !== 'Enter') return;
+
+        const target = e.target;
+        if (
+            target instanceof HTMLInputElement ||
+            target instanceof HTMLTextAreaElement ||
+            target instanceof HTMLSelectElement ||
+            target instanceof HTMLButtonElement ||
+            target.isContentEditable
+        ) {
+            return;
+        }
+
+        e.preventDefault();
+        this.handlePlayPause();
     }
 
     /* ────────── 点击编辑数字 ────────── */
@@ -752,10 +797,16 @@ class PuffsTimerView extends ItemView {
             if (!committed) { committed = true; commit(); }
         });
         input.addEventListener('keydown', e => {
-            if (e.key === 'Enter') input.blur();
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                e.stopPropagation();
+                if (!committed) { committed = true; commit(); }
+                this.focusPanel();
+            }
             if (e.key === 'Escape') {
                 committed = true;
                 this.renderDisplay(this.totalSeconds); // 取消编辑，恢复原值
+                this.focusPanel();
             }
         });
     }
@@ -1151,7 +1202,7 @@ class PuffsTimerSettingTab extends PluginSettingTab {
 
         new Setting(el)
             .setName('启用定时关机')
-            .setDesc('开启后，每天到达设定时间时自动关机（关机前 15 分钟会弹窗提醒）')
+            .setDesc('开启后，每天到达设定时间时自动关机')
             .addToggle(t => t
                 .setValue(this.plugin.settings.enableShutdown)
                 .onChange(async v => {

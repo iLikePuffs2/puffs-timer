@@ -13,6 +13,10 @@
     box-sizing: border-box;
 }
 
+.puffs-timer-root:focus {
+    outline: none;
+}
+
 /* 内层包裹：限制最大宽度，承载所有内容 */
 .puffs-timer-wrapper {
     display: flex;
